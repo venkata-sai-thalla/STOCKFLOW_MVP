@@ -17,6 +17,7 @@ class Product(Base):
     low_stock_threshold = Column(Integer, nullable=True)
     
     last_updated_by = Column(String(255), nullable=True)
+    last_adjustment_note = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

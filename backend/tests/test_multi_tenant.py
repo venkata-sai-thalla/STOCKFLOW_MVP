@@ -7,7 +7,6 @@ from sqlalchemy.pool import StaticPool
 from app.main import app
 from app.db.session import Base, get_db
 
-# Use an in-memory SQLite database for fast, isolated test execution
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
@@ -36,155 +35,184 @@ def setup_database():
 def client():
     return TestClient(app)
 
-def test_signup_creates_org_and_user(client):
+def test_signup_creates_org_and_owner_user(client):
     res = client.post("/api/v1/auth/signup", json={
-        "email": "owner@tenant1.com",
-        "password": "securepassword",
-        "organization_name": "Tenant One"
+        "email": "owner@acme.com",
+        "password": "password123",
+        "organization_name": "Acme Retail"
     })
     assert res.status_code == 201
     data = res.json()
     assert "access_token" in data
-    assert data["user"]["email"] == "owner@tenant1.com"
-    assert data["user"]["organization"]["name"] == "Tenant One"
+    assert data["user"]["email"] == "owner@acme.com"
+    assert data["user"]["organization"]["name"] == "Acme Retail"
+    assert data["user"]["organization"]["default_low_stock_threshold"] == 5
 
 def test_login_flow(client):
     client.post("/api/v1/auth/signup", json={
-        "email": "user@test.com",
-        "password": "mypassword123",
-        "organization_name": "Test Org"
+        "email": "user@retail.com",
+        "password": "password123",
+        "organization_name": "Retail Store"
     })
-    
-    # Successful login
+    # Valid login
     res = client.post("/api/v1/auth/login", json={
-        "email": "user@test.com",
-        "password": "mypassword123"
+        "email": "user@retail.com",
+        "password": "password123"
     })
     assert res.status_code == 200
     assert "access_token" in res.json()
 
-    # Bad password
-    bad = client.post("/api/v1/auth/login", json={
-        "email": "user@test.com",
+    # Invalid login
+    res_bad = client.post("/api/v1/auth/login", json={
+        "email": "user@retail.com",
         "password": "wrongpassword"
     })
-    assert bad.status_code == 401
+    assert res_bad.status_code == 401
 
-def test_multi_tenant_data_isolation(client):
-    # 1. Signup Tenant A
+def test_tenant_data_scoping_and_org_unique_sku(client):
+    # Setup Tenant A
     res_a = client.post("/api/v1/auth/signup", json={
-        "email": "alice@company-a.com",
-        "password": "passwordA",
-        "organization_name": "Company A"
+        "email": "a@tenant.com",
+        "password": "password",
+        "organization_name": "Org A"
     })
     token_a = res_a.json()["access_token"]
     headers_a = {"Authorization": f"Bearer {token_a}"}
 
-    # 2. Signup Tenant B
+    # Setup Tenant B
     res_b = client.post("/api/v1/auth/signup", json={
-        "email": "bob@company-b.com",
-        "password": "passwordB",
-        "organization_name": "Company B"
+        "email": "b@tenant.com",
+        "password": "password",
+        "organization_name": "Org B"
     })
     token_b = res_b.json()["access_token"]
     headers_b = {"Authorization": f"Bearer {token_b}"}
 
-    # Tenant A creates product with SKU "SKU-100"
-    prod_a = client.post("/api/v1/products", headers=headers_a, json={
-        "name": "Widget A",
-        "sku": "SKU-100",
-        "quantity_on_hand": 10,
-        "cost_price": 5.0,
-        "selling_price": 10.0,
-        "low_stock_threshold": 3
+    # Org A creates product SKU-01
+    create_a = client.post("/api/v1/products", headers=headers_a, json={
+        "name": "Org A Item",
+        "sku": "SKU-01",
+        "quantity_on_hand": 10
     })
-    assert prod_a.status_code == 201
-    prod_a_id = prod_a.json()["id"]
+    assert create_a.status_code == 201
+    prod_a_id = create_a.json()["id"]
 
-    # Tenant B creates same SKU "SKU-100" (should succeed because SKU uniqueness is per org)
-    prod_b = client.post("/api/v1/products", headers=headers_b, json={
-        "name": "Widget B",
-        "sku": "SKU-100",
-        "quantity_on_hand": 2,
-        "cost_price": 7.0,
-        "selling_price": 15.0
+    # Duplicate SKU within Org A fails
+    dup_a = client.post("/api/v1/products", headers=headers_a, json={
+        "name": "Org A Duplicate",
+        "sku": "SKU-01",
+        "quantity_on_hand": 5
     })
-    assert prod_b.status_code == 201
+    assert dup_a.status_code == 400
+    assert "already exists in your organization" in dup_a.json()["detail"]
 
-    # Tenant B tries to get Tenant A's product -> 404
+    # Org B creates identical SKU-01 (must succeed due to tenant isolation)
+    create_b = client.post("/api/v1/products", headers=headers_b, json={
+        "name": "Org B Item",
+        "sku": "SKU-01",
+        "quantity_on_hand": 20
+    })
+    assert create_b.status_code == 201
+
+    # Cross-tenant read is blocked
     cross_read = client.get(f"/api/v1/products/{prod_a_id}", headers=headers_b)
     assert cross_read.status_code == 404
 
-    # Tenant B lists products -> only sees their own product
-    list_b = client.get("/api/v1/products", headers=headers_b)
-    assert list_b.status_code == 200
-    items_b = list_b.json()
-    assert len(items_b) == 1
-    assert items_b[0]["name"] == "Widget B"
-
-def test_stock_adjustment_and_low_stock_calculation(client):
-    res = client.post("/api/v1/auth/signup", json={
-        "email": "manager@store.com",
-        "password": "password",
-        "organization_name": "My Store"
+    # Cross-tenant update is blocked
+    cross_update = client.put(f"/api/v1/products/{prod_a_id}", headers=headers_b, json={
+        "name": "Hacked Name"
     })
-    token = res.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
+    assert cross_update.status_code == 404
 
-    # Create product with default org threshold (5)
-    create_res = client.post("/api/v1/products", headers=headers, json={
-        "name": "Keyboard",
-        "sku": "KB-01",
+    # Cross-tenant stock adjust is blocked
+    cross_adjust = client.post(f"/api/v1/products/{prod_a_id}/adjust-stock", headers=headers_b, json={
+        "adjustment": -5
+    })
+    assert cross_adjust.status_code == 404
+
+    # Cross-tenant delete is blocked
+    cross_delete = client.delete(f"/api/v1/products/{prod_a_id}", headers=headers_b)
+    assert cross_delete.status_code == 404
+
+def test_stock_adjustment_and_reason_persistence(client):
+    res = client.post("/api/v1/auth/signup", json={
+        "email": "stock@test.com",
+        "password": "password",
+        "organization_name": "Stock Org"
+    })
+    headers = {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+    create = client.post("/api/v1/products", headers=headers, json={
+        "name": "Coffee Beans",
+        "sku": "CB-01",
+        "quantity_on_hand": 15
+    })
+    prod_id = create.json()["id"]
+
+    # Valid positive adjustment with reason note
+    adj_pos = client.post(f"/api/v1/products/{prod_id}/adjust-stock", headers=headers, json={
+        "adjustment": 5,
+        "note": "Restocked 5 bags from supplier"
+    })
+    assert adj_pos.status_code == 200
+    assert adj_pos.json()["quantity_on_hand"] == 20
+    assert adj_pos.json()["last_adjustment_note"] == "Restocked 5 bags from supplier"
+
+    # Negative adjustment resulting in negative stock is rejected
+    adj_invalid = client.post(f"/api/v1/products/{prod_id}/adjust-stock", headers=headers, json={
+        "adjustment": -25,
+        "note": "Invalid deduction"
+    })
+    assert adj_invalid.status_code == 400
+    assert "Stock cannot be negative" in adj_invalid.json()["detail"]
+
+    # Verify stock remained 20
+    get_prod = client.get(f"/api/v1/products/{prod_id}", headers=headers)
+    assert get_prod.json()["quantity_on_hand"] == 20
+
+def test_threshold_fallback_and_boundary_conditions(client):
+    res = client.post("/api/v1/auth/signup", json={
+        "email": "thresh@test.com",
+        "password": "password",
+        "organization_name": "Threshold Testing"
+    })
+    headers = {"Authorization": f"Bearer {res.json()['access_token']}"}
+
+    # Org default starts at 5. Create product with no custom threshold at 5 units
+    p1 = client.post("/api/v1/products", headers=headers, json={
+        "name": "Item at boundary",
+        "sku": "BOUND-01",
+        "quantity_on_hand": 5
+    }).json()
+    assert p1["effective_threshold"] == 5
+    assert p1["is_low_stock"] is True  # 5 <= 5 is low stock
+
+    # Create product at 6 units (not low stock)
+    p2 = client.post("/api/v1/products", headers=headers, json={
+        "name": "Item above boundary",
+        "sku": "BOUND-02",
+        "quantity_on_hand": 6
+    }).json()
+    assert p2["is_low_stock"] is False
+
+    # Product with explicit custom threshold (e.g. 10)
+    p3 = client.post("/api/v1/products", headers=headers, json={
+        "name": "Custom threshold item",
+        "sku": "BOUND-03",
         "quantity_on_hand": 8,
-        "selling_price": 49.99
-    })
-    assert create_res.status_code == 201
-    prod = create_res.json()
-    assert prod["is_low_stock"] is False
-    assert prod["effective_threshold"] == 5
+        "low_stock_threshold": 10
+    }).json()
+    assert p3["effective_threshold"] == 10
+    assert p3["is_low_stock"] is True  # 8 <= 10
 
-    # Adjust stock: subtract 4 units (8 - 4 = 4 units <= 5 threshold -> low stock triggers)
-    adj_res = client.post(f"/api/v1/products/{prod['id']}/adjust-stock", headers=headers, json={
-        "adjustment": -4,
-        "note": "Damaged goods deduction"
-    })
-    assert adj_res.status_code == 200
-    updated_prod = adj_res.json()
-    assert updated_prod["quantity_on_hand"] == 4
-    assert updated_prod["is_low_stock"] is True
+    # Dashboard aggregates
+    dash = client.get("/api/v1/dashboard/summary", headers=headers).json()
+    assert dash["total_products"] == 3
+    assert dash["total_quantity_on_hand"] == 19  # 5 + 6 + 8
+    assert dash["low_stock_count"] == 2  # p1 and p3
 
-    # Dashboard reflects 1 product and 1 low stock item
-    dash_res = client.get("/api/v1/dashboard/summary", headers=headers)
-    assert dash_res.status_code == 200
-    dash = dash_res.json()
-    assert dash["total_products"] == 1
-    assert dash["total_quantity_on_hand"] == 4
-    assert dash["low_stock_count"] == 1
-    assert len(dash["low_stock_products"]) == 1
-
-def test_org_settings_low_stock_threshold_update(client):
-    res = client.post("/api/v1/auth/signup", json={
-        "email": "admin@org.com",
-        "password": "password",
-        "organization_name": "Threshold Org"
-    })
-    token = res.json()["access_token"]
-    headers = {"Authorization": f"Bearer {token}"}
-
-    # Update org threshold from 5 to 10
-    put_settings = client.put("/api/v1/settings", headers=headers, json={
-        "default_low_stock_threshold": 10
-    })
-    assert put_settings.status_code == 200
-    assert put_settings.json()["default_low_stock_threshold"] == 10
-
-    # Create product with 8 units and no custom threshold
-    p = client.post("/api/v1/products", headers=headers, json={
-        "name": "Monitor",
-        "sku": "MON-01",
-        "quantity_on_hand": 8
-    })
-    assert p.status_code == 201
-    p_data = p.json()
-    assert p_data["effective_threshold"] == 10
-    assert p_data["is_low_stock"] is True  # 8 <= 10
+    # Update org settings threshold to 8
+    client.put("/api/v1/settings", headers=headers, json={"default_low_stock_threshold": 8})
+    dash2 = client.get("/api/v1/dashboard/summary", headers=headers).json()
+    # Now p2 (6 units) is <= 8 default threshold, so low_stock_count becomes 3
+    assert dash2["low_stock_count"] == 3

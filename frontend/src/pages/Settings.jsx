@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Save, Check, Shield } from 'lucide-react';
+import { Save, Check, Settings as SettingsIcon } from 'lucide-react';
 
 const Settings = () => {
   const [threshold, setThreshold] = useState(5);
@@ -16,7 +16,7 @@ const Settings = () => {
         const res = await api.get('/settings');
         setThreshold(res.data.default_low_stock_threshold);
       } catch (err) {
-        setError('Failed to query organization settings.');
+        setError('Failed to load settings.');
       } finally {
         setLoading(false);
       }
@@ -35,10 +35,10 @@ const Settings = () => {
         default_low_stock_threshold: parseInt(threshold, 10),
       });
       setThreshold(res.data.default_low_stock_threshold);
-      setMessage('Policy successfully updated and deployed.');
+      setMessage('Settings updated successfully.');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to update policy.');
+      setError(err.response?.data?.detail || 'Failed to update settings.');
     } finally {
       setSaving(false);
     }
@@ -46,8 +46,8 @@ const Settings = () => {
 
   if (loading) {
     return (
-      <div style={{ padding: '6rem 0', textAlign: 'center', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-        QUERYING TENANT POLICIES...
+      <div style={{ padding: '5rem 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+        Loading settings...
       </div>
     );
   }
@@ -56,8 +56,8 @@ const Settings = () => {
     <div className="fade-in">
       <div className="section-header">
         <div>
-          <h1 className="section-title">Organization Policy</h1>
-          <p className="section-desc">Manage tenant-level operational rules, automated restock thresholds, and alert parameters</p>
+          <h1 className="section-title">Settings</h1>
+          <p className="section-desc">Manage organization settings and default inventory thresholds</p>
         </div>
       </div>
 
@@ -69,17 +69,17 @@ const Settings = () => {
       )}
       {error && <div className="callout callout-danger">{error}</div>}
 
-      <div className="panel" style={{ maxWidth: '640px' }}>
+      <div className="panel" style={{ maxWidth: '600px' }}>
         <div className="panel-header">
           <div className="panel-title">
-            <Shield size={16} color="var(--brand-primary)" />
-            <span>Default Low-Stock Replenishment Rule</span>
+            <SettingsIcon size={16} color="var(--brand-primary)" />
+            <span>Default Low Stock Threshold</span>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ padding: '1.75rem' }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
           <div className="field">
-            <label className="field-label">GLOBAL THRESHOLD (UNITS ON HAND)</label>
+            <label className="field-label">DEFAULT LOW STOCK THRESHOLD (UNITS)</label>
             <input
               type="number"
               min="0"
@@ -87,10 +87,10 @@ const Settings = () => {
               value={threshold}
               onChange={(e) => setThreshold(e.target.value)}
               required
-              style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', maxWidth: '180px' }}
+              style={{ fontFamily: 'var(--font-mono)', fontSize: '1rem', maxWidth: '160px' }}
             />
-            <div className="field-helper" style={{ lineHeight: 1.6, marginTop: '0.65rem' }}>
-              Whenever an active inventory SKU does not declare an individual threshold, this tenant-wide baseline triggers dashboard telemetry warnings and low-stock indicators.
+            <div className="field-helper" style={{ lineHeight: 1.5, marginTop: '0.5rem' }}>
+              If a product does not have an individual threshold set, this default value is used to determine low stock on the dashboard and product catalog.
             </div>
           </div>
 
@@ -101,7 +101,7 @@ const Settings = () => {
             style={{ marginTop: '0.5rem' }}
           >
             <Save size={15} />
-            <span>{saving ? 'Saving...' : 'Deploy Policy'}</span>
+            <span>{saving ? 'Saving...' : 'Save Settings'}</span>
           </button>
         </form>
       </div>

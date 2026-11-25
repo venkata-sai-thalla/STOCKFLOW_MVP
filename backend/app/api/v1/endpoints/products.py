@@ -11,9 +11,7 @@ from app.schemas.product import (
     ProductUpdate,
     ProductResponse,
     StockAdjustment,
-    DashboardSummaryResponse
 )
-from app.schemas.user import OrganizationResponse, OrganizationUpdateSettings
 from app.api.deps import get_current_user, get_current_org
 
 router = APIRouter()
@@ -33,6 +31,7 @@ def serialize_product(product: Product, default_threshold: int) -> dict:
         "effective_threshold": threshold,
         "is_low_stock": product.quantity_on_hand <= threshold,
         "last_updated_by": product.last_updated_by,
+        "last_adjustment_note": getattr(product, "last_adjustment_note", None),
         "created_at": product.created_at,
         "updated_at": product.updated_at
     }
@@ -166,6 +165,8 @@ def adjust_stock(
 
     product.quantity_on_hand = new_quantity
     product.last_updated_by = current_user.email
+    if data.note:
+        product.last_adjustment_note = data.note.strip()
     db.commit()
     db.refresh(product)
     return serialize_product(product, current_org.default_low_stock_threshold)

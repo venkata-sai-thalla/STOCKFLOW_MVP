@@ -34,6 +34,7 @@ class ProductResponse(ProductBase):
     is_low_stock: bool = False
     effective_threshold: int = 5
     last_updated_by: Optional[str] = None
+    last_adjustment_note: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
