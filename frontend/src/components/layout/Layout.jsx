@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, Package, Settings as SettingsIcon, LogOut, Boxes } from 'lucide-react';
+import { Layers, Activity, Sliders, LogOut, Terminal } from 'lucide-react';
 
 const Layout = () => {
   const { user, logout } = useAuth();
@@ -13,46 +13,51 @@ const Layout = () => {
   };
 
   return (
-    <div className="app-container">
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <div className="logo-icon">
-            <Boxes size={20} />
+    <div className="app-shell">
+      <header className="topbar-header">
+        <div className="topbar-inner">
+          <div className="brand-section">
+            <div className="brand-logo">
+              <div className="logo-symbol">
+                <Terminal size={19} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <span className="brand-title">STOCKFLOW</span>
+                <span className="brand-pill">TENANT-OS</span>
+              </div>
+            </div>
+
+            <nav className="nav-tabs">
+              <NavLink to="/" className={({ isActive }) => (isActive ? 'tab-link active' : 'tab-link')}>
+                <Activity size={15} />
+                <span>Telemetry</span>
+              </NavLink>
+              <NavLink to="/products" className={({ isActive }) => (isActive ? 'tab-link active' : 'tab-link')}>
+                <Layers size={15} />
+                <span>Inventory Catalog</span>
+              </NavLink>
+              <NavLink to="/settings" className={({ isActive }) => (isActive ? 'tab-link active' : 'tab-link')}>
+                <Sliders size={15} />
+                <span>Org Policy</span>
+              </NavLink>
+            </nav>
           </div>
-          <div>
-            <div style={{ fontWeight: '700', fontSize: '1.1rem' }}>StockFlow</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Multi-Tenant MVP</div>
+
+          <div className="topbar-actions">
+            <div className="tenant-badge" title={user?.email}>
+              <span className="tenant-status-dot"></span>
+              <span className="tenant-name">{user?.organization?.name || 'Organization'}</span>
+            </div>
+
+            <button onClick={handleLogout} className="btn btn-ghost btn-sm" title="Sign out of tenant">
+              <LogOut size={14} />
+              <span>Exit</span>
+            </button>
           </div>
         </div>
+      </header>
 
-        <nav className="sidebar-nav">
-          <NavLink to="/" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-            <LayoutDashboard size={18} />
-            <span>Dashboard</span>
-          </NavLink>
-          <NavLink to="/products" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-            <Package size={18} />
-            <span>Products</span>
-          </NavLink>
-          <NavLink to="/settings" className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}>
-            <SettingsIcon size={18} />
-            <span>Settings</span>
-          </NavLink>
-        </nav>
-
-        <div className="sidebar-footer">
-          <div className="user-badge">
-            <div className="org-name">{user?.organization?.name || 'Your Organization'}</div>
-            <div className="user-email">{user?.email}</div>
-          </div>
-          <button onClick={handleLogout} className="btn btn-secondary btn-sm" style={{ width: '100%', justifyContent: 'center' }}>
-            <LogOut size={14} />
-            Logout
-          </button>
-        </div>
-      </aside>
-
-      <main className="main-content">
+      <main className="main-viewport">
         <Outlet />
       </main>
     </div>
