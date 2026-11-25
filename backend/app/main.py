@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import json
 
 from app.core.config import settings
 from app.api.v1.router import api_router
@@ -24,32 +23,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Parse CORS origins flexibly
-cors_origins = []
-raw_cors = settings.BACKEND_CORS_ORIGINS
-if isinstance(raw_cors, str):
-    if raw_cors == "*":
-        cors_origins = ["*"]
-    elif raw_cors.startswith("["):
-        try:
-            cors_origins = json.loads(raw_cors)
-        except Exception:
-            cors_origins = [raw_cors]
-    else:
-        cors_origins = [c.strip() for c in raw_cors.split(",") if c.strip()]
-elif isinstance(raw_cors, list):
-    cors_origins = raw_cors
-
-# Always allow Vercel domain or fallback to wildcard
-if not cors_origins:
-    cors_origins = ["*"]
-
+# Robust CORS middleware: allow regex pattern for any vercel.app and localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins if "*" not in cors_origins else ["*"],
-    allow_credentials=True if "*" not in cors_origins else False,
+    allow_origins=[
+        "https://stockflow-mvp-plum.vercel.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000"
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
