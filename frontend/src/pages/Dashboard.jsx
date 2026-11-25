@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { Package, AlertTriangle, Layers, ArrowRight } from 'lucide-react';
+import { Package, AlertTriangle, Layers, ArrowRight, CheckCircle2 } from 'lucide-react';
 
 const Dashboard = () => {
   const [summary, setSummary] = useState(null);
@@ -25,19 +25,23 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading dashboard summary...</div>;
+    return (
+      <div style={{ padding: '3.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+        Loading dashboard metrics...
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Dashboard Overview</h1>
-          <p className="page-subtitle">Summary of your organization's inventory health</p>
+          <p className="page-subtitle">Real-time status of your catalog, stock levels, and replenishment alerts</p>
         </div>
         <Link to="/products" className="btn btn-primary">
-          Manage Products
-          <ArrowRight size={16} />
+          <span>Manage Products</span>
+          <ArrowRight size={15} />
         </Link>
       </div>
 
@@ -46,7 +50,7 @@ const Dashboard = () => {
       <div className="stat-grid">
         <div className="stat-card">
           <div className="stat-icon" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
-            <Package size={24} />
+            <Package size={22} />
           </div>
           <div>
             <div className="stat-value">{summary?.total_products ?? 0}</div>
@@ -55,8 +59,8 @@ const Dashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: '#f0fdf4', color: '#16a34a' }}>
-            <Layers size={24} />
+          <div className="stat-icon" style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)' }}>
+            <Layers size={22} />
           </div>
           <div>
             <div className="stat-value">{summary?.total_quantity_on_hand ?? 0}</div>
@@ -65,8 +69,14 @@ const Dashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon" style={{ backgroundColor: summary?.low_stock_count > 0 ? 'var(--warning-light)' : '#f8fafc', color: summary?.low_stock_count > 0 ? 'var(--warning-text)' : 'var(--text-muted)' }}>
-            <AlertTriangle size={24} />
+          <div
+            className="stat-icon"
+            style={{
+              backgroundColor: summary?.low_stock_count > 0 ? 'var(--warning-light)' : 'var(--bg-subtle)',
+              color: summary?.low_stock_count > 0 ? 'var(--warning-text)' : 'var(--text-muted)',
+            }}
+          >
+            <AlertTriangle size={22} />
           </div>
           <div>
             <div className="stat-value">{summary?.low_stock_count ?? 0}</div>
@@ -77,44 +87,47 @@ const Dashboard = () => {
 
       <div className="card">
         <div className="card-title">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
             <AlertTriangle size={18} color="var(--warning)" />
             <span>Low Stock Items (Qty &le; Threshold)</span>
           </div>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>
-            Default Threshold: {summary?.default_low_stock_threshold ?? 5} units
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 500 }}>
+            Org Default Threshold: <strong>{summary?.default_low_stock_threshold ?? 5}</strong> units
           </span>
         </div>
 
         {summary?.low_stock_products?.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: '500', color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-              All stocks are healthy
+          <div style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+            <CheckCircle2 size={36} color="var(--success)" style={{ margin: '0 auto 0.75rem', opacity: 0.8 }} />
+            <div style={{ fontSize: '1rem', fontWeight: '600', color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+              All Inventory Healthy
             </div>
-            No products are currently at or below their low stock threshold.
+            <div>No products are currently at or below their low stock threshold.</div>
           </div>
         ) : (
           <div className="table-container">
             <table>
               <thead>
                 <tr>
-                  <th>Product Name</th>
-                  <th>SKU</th>
-                  <th>Quantity on Hand</th>
-                  <th>Threshold</th>
-                  <th>Status</th>
+                  <th style={{ width: '38%' }}>Product Name</th>
+                  <th style={{ width: '22%' }}>SKU</th>
+                  <th style={{ width: '15%', textAlign: 'right' }}>Qty on Hand</th>
+                  <th style={{ width: '13%', textAlign: 'right' }}>Threshold</th>
+                  <th style={{ width: '12%', textAlign: 'right' }}>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {summary?.low_stock_products.map((item) => (
                   <tr key={item.id}>
-                    <td style={{ fontWeight: '600' }}>{item.name}</td>
-                    <td><code>{item.sku}</code></td>
-                    <td style={{ fontWeight: '700', color: 'var(--danger-text)' }}>
+                    <td style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.name}</td>
+                    <td><code className="sku-badge">{item.sku}</code></td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--danger-text)', fontVariantNumeric: 'tabular-nums' }}>
                       {item.quantity_on_hand}
                     </td>
-                    <td>{item.effective_threshold}</td>
-                    <td>
+                    <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>
+                      {item.effective_threshold}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
                       <span className="badge badge-warning">Low Stock</span>
                     </td>
                   </tr>

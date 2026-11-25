@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Plus, Search, Edit2, Trash2, Sliders, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Sliders, AlertCircle, CheckCircle, Package } from 'lucide-react';
 
 const Products = () => {
   const [products, setProducts] = useState([]);
@@ -50,7 +50,7 @@ const Products = () => {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchProducts(search);
-    }, 300);
+    }, 250);
     return () => clearTimeout(delayDebounceFn);
   }, [search]);
 
@@ -76,9 +76,9 @@ const Products = () => {
       sku: p.sku,
       description: p.description || '',
       quantity_on_hand: p.quantity_on_hand,
-      cost_price: p.cost_price !== null ? p.cost_price : '',
-      selling_price: p.selling_price !== null ? p.selling_price : '',
-      low_stock_threshold: p.low_stock_threshold !== null ? p.low_stock_threshold : '',
+      cost_price: p.cost_price !== null && p.cost_price !== undefined ? p.cost_price : '',
+      selling_price: p.selling_price !== null && p.selling_price !== undefined ? p.selling_price : '',
+      low_stock_threshold: p.low_stock_threshold !== null && p.low_stock_threshold !== undefined ? p.low_stock_threshold : '',
     });
     setError('');
     setIsFormOpen(true);
@@ -89,9 +89,9 @@ const Products = () => {
     setError('');
 
     const payload = {
-      name: formData.name,
-      sku: formData.sku,
-      description: formData.description || null,
+      name: formData.name.trim(),
+      sku: formData.sku.trim(),
+      description: formData.description ? formData.description.trim() : null,
       quantity_on_hand: parseInt(formData.quantity_on_hand, 10) || 0,
       cost_price: formData.cost_price !== '' ? parseFloat(formData.cost_price) : null,
       selling_price: formData.selling_price !== '' ? parseFloat(formData.selling_price) : null,
@@ -127,10 +127,10 @@ const Products = () => {
     try {
       await api.post(`/products/${adjustingProduct.id}/adjust-stock`, {
         adjustment: parseInt(adjustData.adjustment, 10),
-        note: adjustData.note || null,
+        note: adjustData.note ? adjustData.note.trim() : null,
       });
       setIsAdjustOpen(false);
-      setSuccessMsg(`Stock adjusted for ${adjustingProduct.name}.`);
+      setSuccessMsg(`Stock updated for ${adjustingProduct.name}.`);
       fetchProducts(search);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
@@ -156,11 +156,11 @@ const Products = () => {
   };
 
   return (
-    <div>
+    <div className="fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Products & Inventory</h1>
-          <p className="page-subtitle">Track, update and control stock across your catalog</p>
+          <p className="page-subtitle">Track, update, and manage inventory levels across your organization</p>
         </div>
         <button onClick={handleOpenCreate} className="btn btn-primary">
           <Plus size={16} />
@@ -171,14 +171,14 @@ const Products = () => {
       {successMsg && <div className="alert alert-success">{successMsg}</div>}
       {error && !isFormOpen && !isAdjustOpen && <div className="alert alert-danger">{error}</div>}
 
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem' }}>
+      <div className="card" style={{ marginBottom: '1.25rem', padding: '0.85rem 1.15rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <Search size={18} color="var(--text-muted)" />
           <input
             type="text"
             className="form-input"
-            style={{ border: 'none', padding: '0.4rem', outline: 'none' }}
-            placeholder="Search by product name or SKU..."
+            style={{ border: 'none', padding: '0.4rem', outline: 'none', background: 'transparent' }}
+            placeholder="Search products by Name or SKU..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -189,60 +189,87 @@ const Products = () => {
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>SKU</th>
-              <th>Qty on Hand</th>
-              <th>Status</th>
-              <th>Selling Price</th>
-              <th>Cost Price</th>
-              <th>Actions</th>
+              <th style={{ width: '26%' }}>Product Name</th>
+              <th style={{ width: '15%' }}>SKU</th>
+              <th style={{ width: '11%', textAlign: 'right' }}>Qty on Hand</th>
+              <th style={{ width: '16%' }}>Stock Status</th>
+              <th style={{ width: '11%', textAlign: 'right' }}>Selling Price</th>
+              <th style={{ width: '10%', textAlign: 'right' }}>Cost Price</th>
+              <th style={{ width: '11%', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '2rem' }}>Loading products...</td>
+                <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                  Loading catalog...
+                </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan="7" style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-                  No products found. Click "Add Product" to create your first item.
+                <td colSpan="7" style={{ textAlign: 'center', padding: '3.5rem 1rem', color: 'var(--text-muted)' }}>
+                  <Package size={36} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
+                  <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                    {search ? 'No matching products found' : 'No products in inventory yet'}
+                  </div>
+                  <div>{search ? 'Try adjusting your search query' : 'Click "Add Product" above to create your first item.'}</div>
                 </td>
               </tr>
             ) : (
               products.map((p) => (
                 <tr key={p.id}>
+                  {/* Column 1: Product Name & Description */}
                   <td>
-                    <div style={{ fontWeight: '600' }}>{p.name}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)' }}>{p.name}</div>
                     {p.description && (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '240px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '320px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: '0.15rem' }}>
                         {p.description}
                       </div>
                     )}
                   </td>
-                  <td><code>{p.sku}</code></td>
-                  <td style={{ fontWeight: '600' }}>{p.quantity_on_hand}</td>
+
+                  {/* Column 2: SKU */}
+                  <td>
+                    <code className="sku-badge">{p.sku}</code>
+                  </td>
+
+                  {/* Column 3: Quantity on Hand */}
+                  <td style={{ textAlign: 'right', fontWeight: 600, fontVariantNumeric: 'tabular-nums', fontSize: '0.925rem' }}>
+                    {p.quantity_on_hand}
+                  </td>
+
+                  {/* Column 4: Stock Status */}
                   <td>
                     {p.is_low_stock ? (
-                      <span className="badge badge-warning">
-                        <AlertCircle size={12} /> Low Stock (&le; {p.effective_threshold})
+                      <span className="badge badge-warning" title={`Threshold: ${p.effective_threshold}`}>
+                        <AlertCircle size={13} /> Low Stock (&le; {p.effective_threshold})
                       </span>
                     ) : (
                       <span className="badge badge-success">
-                        <CheckCircle size={12} /> In Stock
+                        <CheckCircle size={13} /> In Stock
                       </span>
                     )}
                   </td>
-                  <td>{p.selling_price !== null ? `$${parseFloat(p.selling_price).toFixed(2)}` : '—'}</td>
-                  <td>{p.cost_price !== null ? `$${parseFloat(p.cost_price).toFixed(2)}` : '—'}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+
+                  {/* Column 5: Selling Price */}
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-main)' }}>
+                    {p.selling_price !== null && p.selling_price !== undefined ? `$${parseFloat(p.selling_price).toFixed(2)}` : '—'}
+                  </td>
+
+                  {/* Column 6: Cost Price */}
+                  <td style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums', color: 'var(--text-muted)' }}>
+                    {p.cost_price !== null && p.cost_price !== undefined ? `$${parseFloat(p.cost_price).toFixed(2)}` : '—'}
+                  </td>
+
+                  {/* Column 7: Actions */}
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => handleOpenAdjust(p)}
                         className="btn btn-secondary btn-sm"
-                        title="Adjust Stock (+/-)"
+                        title="Quick Stock Adjustment (+/-)"
                       >
-                        <Sliders size={14} />
+                        <Sliders size={13} />
                         Adjust
                       </button>
                       <button
@@ -250,14 +277,14 @@ const Products = () => {
                         className="btn btn-secondary btn-sm"
                         title="Edit Product"
                       >
-                        <Edit2 size={14} />
+                        <Edit2 size={13} />
                       </button>
                       <button
                         onClick={() => handleOpenDelete(p)}
                         className="btn btn-danger btn-sm"
                         title="Delete Product"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
                       </button>
                     </div>
                   </td>
@@ -278,7 +305,7 @@ const Products = () => {
               </h2>
               <button
                 onClick={() => setIsFormOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.35rem', color: 'var(--text-muted)' }}
               >
                 &times;
               </button>
@@ -295,20 +322,21 @@ const Products = () => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Wireless Mouse"
+                  placeholder="e.g. Ergonomic Office Chair"
                 />
               </div>
 
               <div className="form-group">
-                <label className="form-label">SKU (Unique per Org) *</label>
+                <label className="form-label">SKU (Unique Identifier) *</label>
                 <input
                   type="text"
                   className="form-input"
                   required
                   value={formData.sku}
                   onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                  placeholder="e.g. WM-100"
+                  placeholder="e.g. CHR-ERG-01"
                 />
+                <div className="form-helper">Stock Keeping Unit must be unique within your organization.</div>
               </div>
 
               <div className="form-group">
@@ -318,7 +346,7 @@ const Products = () => {
                   rows="2"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Short description..."
+                  placeholder="Add product specifications or notes..."
                 />
               </div>
 
@@ -341,7 +369,7 @@ const Products = () => {
                     type="number"
                     min="0"
                     className="form-input"
-                    placeholder="Leave empty for org default"
+                    placeholder="Uses org default if empty"
                     value={formData.low_stock_threshold}
                     onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
                   />
@@ -403,7 +431,7 @@ const Products = () => {
               </h2>
               <button
                 onClick={() => setIsAdjustOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.35rem', color: 'var(--text-muted)' }}
               >
                 &times;
               </button>
@@ -411,34 +439,34 @@ const Products = () => {
 
             {error && <div className="alert alert-danger">{error}</div>}
 
-            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Current stock: <strong>{adjustingProduct?.quantity_on_hand}</strong> units.
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
+              Current stock on hand: <strong style={{ color: 'var(--text-main)' }}>{adjustingProduct?.quantity_on_hand}</strong> units.
             </p>
 
             <form onSubmit={handleSaveAdjust}>
               <div className="form-group">
-                <label className="form-label">Units to Add or Subtract (+/-)</label>
+                <label className="form-label">Stock Change (+/-)</label>
                 <input
                   type="number"
                   className="form-input"
                   required
                   value={adjustData.adjustment}
                   onChange={(e) => setAdjustData({ ...adjustData, adjustment: e.target.value })}
-                  placeholder="e.g. 10 or -5"
+                  placeholder="e.g. +10 or -5"
                 />
                 <div className="form-helper">
-                  Use positive numbers to add stock, negative to reduce.
+                  Positive values add units to inventory; negative values deduct units.
                 </div>
               </div>
 
               <div className="form-group">
-                <label className="form-label">Note / Reason (Optional)</label>
+                <label className="form-label">Reason / Reference Note (Optional)</label>
                 <input
                   type="text"
                   className="form-input"
                   value={adjustData.note}
                   onChange={(e) => setAdjustData({ ...adjustData, note: e.target.value })}
-                  placeholder="e.g. Supplier delivery, damaged goods"
+                  placeholder="e.g. Restocked batch #42, Damaged in transit"
                 />
               </div>
 
@@ -451,7 +479,7 @@ const Products = () => {
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Confirm Adjustment
+                  Confirm Stock Change
                 </button>
               </div>
             </form>
@@ -459,7 +487,7 @@ const Products = () => {
         </div>
       )}
 
-      {/* Confirm Delete Dialog */}
+      {/* Delete Confirmation Dialog */}
       {isDeleteOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -469,14 +497,14 @@ const Products = () => {
               </h2>
               <button
                 onClick={() => setIsDeleteOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.35rem', color: 'var(--text-muted)' }}
               >
                 &times;
               </button>
             </div>
 
-            <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-              Are you sure you want to delete <strong>{deletingProduct?.name}</strong> (SKU: {deletingProduct?.sku})?
+            <p style={{ fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '1.5rem', color: 'var(--text-main)' }}>
+              Are you sure you want to permanently delete <strong>{deletingProduct?.name}</strong> (SKU: <code>{deletingProduct?.sku}</code>)?
               This action cannot be undone.
             </p>
 
@@ -493,7 +521,7 @@ const Products = () => {
                 onClick={handleConfirmDelete}
                 className="btn btn-danger"
               >
-                Yes, Delete Product
+                Yes, Delete
               </button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Save } from 'lucide-react';
+import { Save, Check } from 'lucide-react';
 
 const Settings = () => {
   const [threshold, setThreshold] = useState(5);
@@ -35,7 +35,7 @@ const Settings = () => {
         default_low_stock_threshold: parseInt(threshold, 10),
       });
       setThreshold(res.data.default_low_stock_threshold);
-      setMessage('Settings updated successfully.');
+      setMessage('Organization settings saved.');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to update settings.');
@@ -45,27 +45,32 @@ const Settings = () => {
   };
 
   if (loading) {
-    return <div style={{ padding: '2rem', textAlign: 'center' }}>Loading organization settings...</div>;
+    return <div style={{ padding: '3.5rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading organization settings...</div>;
   }
 
   return (
-    <div>
+    <div className="fade-in">
       <div className="page-header">
         <div>
           <h1 className="page-title">Organization Settings</h1>
-          <p className="page-subtitle">Configure organization-wide defaults and thresholds</p>
+          <p className="page-subtitle">Configure organization-level defaults and replenishment triggers</p>
         </div>
       </div>
 
-      {message && <div className="alert alert-success">{message}</div>}
+      {message && (
+        <div className="alert alert-success">
+          <Check size={16} />
+          <span>{message}</span>
+        </div>
+      )}
       {error && <div className="alert alert-danger">{error}</div>}
 
-      <div className="card" style={{ maxWidth: '600px' }}>
-        <div className="card-title">Low Stock Threshold Configuration</div>
+      <div className="card" style={{ maxWidth: '580px' }}>
+        <div className="card-title">Default Replenishment Threshold</div>
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Default Low Stock Threshold</label>
+            <label className="form-label">Global Low Stock Threshold (Units)</label>
             <input
               type="number"
               min="0"
@@ -75,7 +80,7 @@ const Settings = () => {
               required
             />
             <div className="form-helper">
-              If a product does not have its own threshold explicitly configured, this organization default value is used to trigger low-stock alerts on the dashboard and product catalog.
+              When a product does not have an individual threshold defined, this default value is used across the dashboard and inventory catalog to trigger low stock warnings.
             </div>
           </div>
 
@@ -83,9 +88,10 @@ const Settings = () => {
             type="submit"
             className="btn btn-primary"
             disabled={saving}
+            style={{ marginTop: '0.5rem' }}
           >
-            <Save size={16} />
-            {saving ? 'Saving...' : 'Save Settings'}
+            <Save size={15} />
+            <span>{saving ? 'Saving changes...' : 'Save Settings'}</span>
           </button>
         </form>
       </div>
