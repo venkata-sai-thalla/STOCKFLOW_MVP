@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.db.session import engine, Base
+from app.db.migrations import migrate_product_adjustment_note
 import app.db.base  # ensure all models are registered
 
 @asynccontextmanager
@@ -12,6 +13,7 @@ async def lifespan(app: FastAPI):
     # Automatically create tables if not existing (ideal for demo/internal MVP)
     try:
         Base.metadata.create_all(bind=engine)
+        migrate_product_adjustment_note(engine)
         print("Database tables verified/created successfully.")
     except Exception as e:
         print(f"Error connecting to DB or creating tables: {e}")

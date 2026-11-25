@@ -74,6 +74,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 - API Docs: `http://localhost:8000/docs`
+- On startup, the backend adds the stock-adjustment note column to existing product tables when needed.
 
 ### 3. Frontend Setup
 ```bash
